@@ -1,0 +1,4 @@
+matplotlib<3.3
+numpy
+obspy>=1.2
+scipy

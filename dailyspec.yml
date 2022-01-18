@@ -1,0 +1,10 @@
+name: dailyspec
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - matplotlib
+  - numpy
+  - obspy >=1.2
+  - python >=3.6
+  - scipy

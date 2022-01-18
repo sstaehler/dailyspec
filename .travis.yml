@@ -1,0 +1,96 @@
+language: python
+
+jobs:
+  include:
+    - name: "Python 3.6 on Xenial Linux"
+      os: linux
+      language: python
+      env: PYTHON_VERSION=3.6
+
+    - name: "Python 3.7 on Xenial Linux"
+      os: linux
+      language: python
+      env: PYTHON_VERSION=3.7
+
+    - name: "Python 3.8 on Xenial Linux"
+      os: linux
+      language: python
+      env: PYTHON_VERSION=3.8
+
+    - name: "Python 3.6 on OSX"
+      os: osx
+      language: generic
+      env: PYTHON_VERSION=3.6
+
+    - name: "Python 3.7 on OSX"
+      os: osx
+      language: generic
+      env: PYTHON_VERSION=3.7
+
+    - name: "Python 3.8 on OSX"
+      os: osx
+      language: generic
+      env: PYTHON_VERSION=3.8
+
+sudo: false
+
+before_install:
+  # Make Python scripts executable
+  # - chmod +x tests/*
+  # - chmod +x examples/Icequake_Iceland/*.py
+
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
+      export OS="MacOSX";
+    else
+      export OS="Linux";
+    fi
+
+  # Set codecov variable
+  #   - export CODECOV_TOKEN="d29dbc54-b153-4eed-b36c-87cf5c5628e0"
+
+  # Grab and install miniconda then create a test environment
+  - wget https://repo.continuum.io/miniconda/Miniconda3-latest-${OS}-x86_64.sh -O miniconda.sh;
+  - bash miniconda.sh -b -p $HOME/miniconda
+  - export PATH="$HOME/miniconda/bin:$PATH"
+  - hash -r
+  - conda config --set always_yes yes --set changeps1 no
+  - conda config --add channels conda-forge
+  - conda update -q conda
+  - conda info -a
+  - echo $PYTHON_VERSION
+  - conda create -q -n test-environment python=$PYTHON_VERSION coverage flake8 matplotlib mock numpy obspy pandas pyproj scipy
+  - source activate test-environment
+
+  # Enforce single-threaded just to stay in memory
+  - export OMP_NUM_THREADS=1;
+
+  # Clean-up
+  - pip install coverage
+  - pip install codecov
+  - pip freeze
+  - conda list
+  - git version
+
+install:
+  - python setup.py
+
+script:
+  - export MPLBACKEND=Agg
+  - cd examples/swiss_station
+  #- coverage run --source=quakemigrate -a iceland_lut.py
+  - python -m dailyspec.plot_spec
+
+after_success:
+  # Check how much code is actually tested and send this report to codecov
+  - ls -a
+  - coverage report
+  - bash <(curl -s https://codecov.io/bash)
+
+notifications:
+  email:
+    recipients:
+      - quakemigrate.developers@gmail.com
+    on_success: never
+    on_failure: always
+  slack:
+    if: branch = master
