@@ -14,7 +14,9 @@ from datetime import timedelta, datetime
 
 import matplotlib.dates as mdates
 import matplotlib.mlab as mlab
+import matplotlib.pyplot
 import matplotlib.pyplot as plt
+import matplotlib.style as mstyle
 import numpy as np
 import obspy
 from matplotlib.patches import Polygon
@@ -23,7 +25,7 @@ from obspy.signal.tf_misfit import cwt
 from obspy.signal.util import next_pow_2
 
 plt.rcParams['agg.path.chunksize'] = 1000
-
+mstyle.use('seaborn-colorblind')
 
 def plot_cwf(tr, fmin=1. / 50, fmax=1. / 2, w0=8):
     npts = tr.stats.npts
@@ -39,6 +41,117 @@ def plot_cwf(tr, fmin=1. / 50, fmax=1. / 2, w0=8):
     return scalogram ** 2, f, t
 
 
+def mark_event(ax_low: matplotlib.pyplot.Axes,
+               ax_up: matplotlib.pyplot.Axes,
+               fig: matplotlib.pyplot.Figure,
+               catalog: obspy.Catalog,
+               stats: dict,
+               starttime=None, endtime=None,
+               phase_list=('3.5kmps', 'PKIKP')):
+    from obspy.taup import TauPyModel
+    from obspy.geodetics import locations2degrees
+    from matplotlib.dates import date2num
+    from matplotlib.transforms import blended_transform_factory
+
+    model = TauPyModel('iasp91')
+    cat_trim = catalog.filter("magnitude >= 4.8",
+                              "time >= %s" % (starttime - 3600),
+                              "time < %s" % (endtime - 120))
+    nevents = len(cat_trim)
+    for i, event in enumerate(cat_trim):
+        ievent = nevents - i
+        origin = event.preferred_origin()
+        distance = locations2degrees(
+            lat1=origin.latitude,
+            long1=origin.longitude,
+            lat2=stats.latitude,
+            long2=stats.longitude)
+
+        trans = blended_transform_factory(ax_up.transData, fig.transFigure)
+        ax_low.axvline(x=origin.time.datetime, c='white', lw=0.6, ls='dashed')
+        ax_up.axvline(x=origin.time.datetime, c='white', lw=0.6, ls='dashed')
+
+        ncols = 5
+        x_event_label = 0.07 + 0.15 * ((ievent - 1) % ncols)
+        y_event_label = 0.09 - 0.03 * ((ievent - 1) // ncols)
+
+        event_label = '{1:s}\nM{2:3.1f} - {3:3d} deg'.format(
+            ievent,
+            event.event_descriptions[0]['text'],
+            event.preferred_magnitude().mag,
+            int(distance))
+        bbox = dict(boxstyle="round", fc='C%d' % ievent)
+        ax_up.annotate(text=event_label,
+                       xy=(x_event_label, y_event_label),
+                       xycoords=fig.transFigure,
+                       textcoords=fig.transFigure,
+                       ha='left', va='center',
+                       fontsize=8)
+        ax_up.annotate(text=str(ievent),
+                       xy=(x_event_label - 0.010, y_event_label),
+                       xycoords=fig.transFigure,
+                       textcoords=fig.transFigure,
+                       ha='left', va='center',
+                       bbox=bbox, fontsize=10)
+
+        ax_up.annotate(
+            text=str(ievent),
+            xy=(date2num(origin.time.datetime), 0.83),
+            xycoords=trans, #ax.get_xaxis_transform(),
+            textcoords=trans, #ax.get_xaxis_transform(),
+            ha='center', va='bottom',
+            fontsize=8,
+            #rotation=270.,
+            annotation_clip=True,
+            bbox=bbox)
+
+        if 'longitude' in stats:
+            arrivals = model.get_travel_times_geo(
+                source_depth_in_km=origin.depth*1e-3,
+                source_latitude_in_deg=origin.latitude,
+                source_longitude_in_deg=origin.longitude,
+                receiver_latitude_in_deg=stats.latitude,
+                receiver_longitude_in_deg=stats.longitude,
+                phase_list=phase_list)
+            for arrival in arrivals:
+                t = arrival.time
+                t_arrival = (origin.time + t)
+                if 180. > arrival.purist_distance > 100. and arrival.name in ['PP', 'SS', '3.5kmps']:
+                    ax_low.axvline(x=t_arrival.datetime, c='lightgrey', lw=0.5)
+                    ax_up.axvline(x=t_arrival.datetime, c='lightgrey', lw=0.5)
+                    ax_up.annotate(xy=(date2num(t_arrival.datetime), 0.83),
+                                   xycoords=trans,
+                                   textcoords=trans,
+                                   fontsize=8,
+                                   ha='center', va='bottom',
+                                   #text=arrival.name)
+                                   text='R')
+                    # ax.annotate(
+                    #     text='', #f'display = ({t_arrival_t:.1f}, {ydisplay:.1f}), {arrival.name}',
+                    #     xy=(t_arrival_t, -5), xycoords='axes pixels',
+                    #     xytext=(t_origin_t, -20), textcoords='axes pixels',
+                    #     ha='left', va='top',
+                    #     rotation=270.,
+                    #     bbox=bbox, arrowprops=arrowprops)
+                elif arrival.purist_distance < 100. and arrival.name in ['P', 'S', '3.5kmps']:
+                    ax_low.axvline(x=t_arrival.datetime, c='lightgrey', lw=0.5)
+                    ax_up.axvline(x=t_arrival.datetime, c='lightgrey', lw=0.5)
+                    ax_up.annotate(xy=(date2num(t_arrival.datetime), 0.83),
+                                   xycoords=trans,
+                                   textcoords=trans,
+                                   fontsize=8,
+                                   ha='center', va='bottom',
+                                   text='R')
+                                   # text=arrival.name)
+                    # ax.annotate(
+                    #     text='', #f'display = ({t_arrival_t:.1f}, {ydisplay:.1f}), {arrival.name}',
+                    #     xy=(t_arrival_t, -5), xycoords='axes pixels',
+                    #     xytext=(t_origin_t, -20), textcoords='axes pixels',
+                    #     ha='left', va='top',
+                    #     rotation=270.,
+                    #     bbox=bbox, arrowprops=arrowprops)
+
+
 def calc_specgram_dual(st_LF, st_HF,
                        winlen_sec_LF=1800,
                        winlen_sec_HF=10.0,
@@ -47,6 +160,7 @@ def calc_specgram_dual(st_LF, st_HF,
                        tstart=None, tend=None,
                        vmin=None, vmax=None, log=True,
                        ratio_LF_spec=0.6,
+                       catalog=None,
                        show=False,
                        fnam=None,
                        noise=None):
@@ -78,6 +192,8 @@ def calc_specgram_dual(st_LF, st_HF,
         Plot spectrogram logarithmic (default) or linear
     :param ratio_LF_spec: float
         How much of the height does the LF spectogram get?
+    :param catalog: obspy.Catalog
+        Catalog object to mark event times
     :param show: bool
         Show interactive matplotlib figure (default: False)
     :param fnam: str
@@ -111,12 +227,12 @@ def calc_specgram_dual(st_LF, st_HF,
     else:
         fmax_HF = fmax
 
-    st_LF.filter('bandpass', freqmin=fmin_LF * 0.9, freqmax=fmax_LF * 1.2,
+    st_LF.filter('highpass', freq=fmin_LF * 0.9,
                  zerophase=True, corners=6)
-    st_HF.filter('bandpass', freqmin=fmin_HF * 0.8, freqmax=fmax_HF,
+    st_HF.filter('bandpass', freqmin=fmin_HF * 0.5, freqmax=fmax_HF,
                  zerophase=True, corners=6)
 
-    ax_cb, ax_psd_HF, ax_psd_LF, \
+    fig, ax_cb, ax_psd_HF, ax_psd_LF, \
     ax_seis_HF, ax_seis_LF, \
     ax_spec_HF, ax_spec_LF, = create_axes(ratio_LF_height=ratio_LF_spec)
 
@@ -124,13 +240,13 @@ def calc_specgram_dual(st_LF, st_HF,
         t = np.arange(utct(tr.stats.starttime).datetime,
                       utct(tr.stats.endtime + tr.stats.delta).datetime,
                       timedelta(seconds=tr.stats.delta)).astype(datetime)
-        ax_seis_LF.plot(t, tr.data * 1e9,
+        ax_seis_LF.plot(t, tr.data * 1e6,
                         'navy', lw=0.3)
     for tr in st_HF:
         t = np.arange(utct(tr.stats.starttime).datetime,
                       utct(tr.stats.endtime + tr.stats.delta).datetime,
                       timedelta(seconds=tr.stats.delta)).astype(datetime)
-        ax_seis_HF.plot(t, tr.data * 1e9,
+        ax_seis_HF.plot(t, tr.data * 1e6,
                         'darkred', lw=0.3)
 
     for st, ax_spec, ax_psd, flim, winlen, cmap, vlim in \
@@ -144,7 +260,7 @@ def calc_specgram_dual(st_LF, st_HF,
                 [(vmin, vmax), (vmin, vmax)]):
 
         for tr in st:
-            print(winlen / tr.stats.sampling_rate, tr.stats.sampling_rate)
+            # print(winlen / tr.stats.sampling_rate, tr.stats.sampling_rate)
             if (kind == 'cwt' and winlen / tr.stats.sampling_rate < 20.) or \
                     (kind == 'spec'):  # and winlen < 600 * tr.stats.sampling_rate):
                 p, f, t = mlab.specgram(tr.data, NFFT=winlen,
@@ -155,7 +271,8 @@ def calc_specgram_dual(st_LF, st_HF,
                 df = 2
                 dt = 4
                 p, f, t = plot_cwf(tr, w0=12,
-                                   fmin=flim[0], fmax=flim[1])
+                                   fmin=flim[0],
+                                   fmax=flim[1])
                 p = p[::df, ::dt]
                 f = f[::df]
                 t = t[::dt]
@@ -163,7 +280,7 @@ def calc_specgram_dual(st_LF, st_HF,
             t += float(tr.stats.starttime)
             delta = t[1] - t[0]
             t = np.arange(utct(t[0]).datetime,
-                          utct(t[-1] + delta).datetime,
+                          utct(t[-1] + delta * 0.9).datetime,
                           timedelta(seconds=delta)).astype(datetime)
 
             bol = np.array((f >= flim[0] * 0.9, f <= flim[1])).all(axis=0)
@@ -178,12 +295,12 @@ def calc_specgram_dual(st_LF, st_HF,
             if log:
                 ax_spec.pcolormesh(t, f[bol], 10 * np.log10(p[bol, :]),
                                    vmin=vmin, vmax=vmax,
-                                   shading='auto',
+                                   shading='nearest',
                                    cmap=cmap)
             else:
                 ax_spec.pcolormesh(t, f[bol], p[bol, :],
                                    vmin=vmin, vmax=vmax,
-                                   shading='auto',
+                                   shading='nearest',
                                    cmap=cmap)
 
             plot_psd(ax_psd, bol, f, p)
@@ -198,6 +315,14 @@ def calc_specgram_dual(st_LF, st_HF,
                 fmax_LF, fmin_HF, fmin_LF, st_HF, st_LF,
                 tstart, tend
                 )
+    if catalog is not None:
+        mark_event(ax_low=ax_spec_LF,
+                   ax_up=ax_spec_HF,
+                   fig=fig,
+                   catalog=catalog,
+                   stats=st_LF[0].stats,
+                   starttime=tstart,
+                   endtime=tend)
 
     if fnam:
         plt.savefig(fnam, dpi=240)
@@ -249,11 +374,11 @@ def format_axes(ax_cb, ax_psd_HF, ax_psd_LF, ax_seis_HF, ax_seis_LF,
                 fmax_LF, fmin_HF, fmin_LF, st_HF, st_LF,
                 tstart, tend
                 ):
-    ax_seis_LF.set_ylim(st_LF[0].std() * 1e10 * np.asarray([-3., 1.]))
-    ax_seis_HF.set_ylim(st_HF[0].std() * 1e10 * np.asarray([-2., 2.]))
-    ax_seis_LF.set_ylabel('%s [nm/s²] \n< 1 Hz' % st_LF[0].stats.channel,
+    ax_seis_LF.set_ylim(st_LF[0].std() * 1e7 * np.asarray([-3., 1.]))
+    ax_seis_HF.set_ylim(st_HF[0].std() * 1e7 * np.asarray([-2., 2.]))
+    ax_seis_LF.set_ylabel('%s [um/s²] \n< 1 Hz' % st_LF[0].stats.channel,
                           color='navy')
-    ax_seis_HF.set_ylabel('%s [nm/s] \n> 1 Hz' % st_HF[0].stats.channel,
+    ax_seis_HF.set_ylabel('%s [um/s] \n> 1 Hz' % st_HF[0].stats.channel,
                           color='darkred')
     ax_seis_LF.tick_params('y', colors='navy')
     ax_seis_HF.tick_params('y', colors='darkred')
@@ -347,7 +472,7 @@ def create_axes(ratio_LF_height=0.6):
                           w_psd * 0.2,
                           h_seis * 0.8],
                          label='colorbar')
-    return ax_cb, ax_psd_HF, ax_psd_LF, ax_seis_HF, ax_seis_LF, \
+    return fig, ax_cb, ax_psd_HF, ax_psd_LF, ax_seis_HF, ax_seis_LF, \
            ax_spec_HF, ax_spec_LF
 
 
@@ -387,7 +512,7 @@ def def_args():
 
     parser.add_argument('--kind', default='spec',
                         help='Calculate spectrogram (spec) or continuous '
-                             'wavelet transfort (cwt, much slower)? Default: '
+                             'wavelet transform (cwt, much slower)? Default: '
                              'spec')
     return parser.parse_args()
 

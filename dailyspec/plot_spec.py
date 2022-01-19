@@ -8,8 +8,6 @@
     None
 """
 from argparse import ArgumentParser
-from .spectrogram import calc_specgram_dual
-import obspy
 
 def define_arguments():
     helptext = 'Plot spectogram of data'
@@ -20,6 +18,9 @@ def define_arguments():
 
     helptext = 'Inventory file'
     parser.add_argument('-i', '--inventory_file', help=helptext)
+
+    helptext = 'Inventory file'
+    parser.add_argument('-c', '--catalog_file', help=helptext, default=None)
 
     helptext = 'Maximum frequency for plot'
     parser.add_argument('--fmax', default=50., type=float, help=helptext)
@@ -55,15 +56,18 @@ def define_arguments():
 
 def main():
     args = define_arguments()
+
+    from .spectrogram import calc_specgram_dual
+    import obspy
+
     st = obspy.Stream()
     for file in args.data_files:
         st += obspy.read(file)
     st.merge(method=1, fill_value='interpolate')
-    if args.fmax < st[0].stats.sampling_rate / 4.:
-        st.decimate(2)
-    if args.fmax < st[0].stats.sampling_rate / 4.:
-        st.decimate(2)
-    if args.fmax < st[0].stats.sampling_rate / 4.:
+    samp_rate_original = st[0].stats.sampling_rate
+    if samp_rate_original > args.fmax * 10 and samp_rate_original % 5 == 0.:
+        st.decimate(5)
+    while st[0].stats.sampling_rate > 4. * args.fmax:
         st.decimate(2)
 
     if args.tstart is not None:
@@ -72,14 +76,24 @@ def main():
         st.trim(t0, t1)
 
     inv = obspy.read_inventory(args.inventory_file)
+    if args.catalog_file is not None:
+        cat = obspy.read_events(args.catalog_file)
+    else:
+        cat = None
+
+    for tr in st:
+        coords = inv.get_coordinates(tr.get_id())
+        tr.stats.latitude = coords['latitude']
+        tr.stats.longitude = coords['longitude']
+        tr.stats.elevation = coords['elevation']
 
     st.remove_response(inventory=inv, output='ACC')
-    st.differentiate()
 
+    # The computation of the LF spectrograms with long time windows or even CWT
+    # can be REALLY slow, thus, decimate it to anything larger 2.5 Hz
     st_LF = st.copy()
-    if st_LF[0].stats.sampling_rate > 4.:
-        st_LF.decimate(2)
-    if st_LF[0].stats.sampling_rate > 4.:
+    while st_LF[0].stats.sampling_rate > 4.:
+        # print('LF samp rate ', st_LF[0].stats.sampling_rate, ' decimating')
         st_LF.decimate(2)
 
     fnam = "spec_{network}.{station}.{location}.{channel}.png".format(**st_LF[0].stats)
@@ -92,6 +106,7 @@ def main():
                        tstart=args.tstart, tend=args.tend,
                        noise='Earth',
                        overlap=0.8,
+                       catalog=cat,
                        winlen_sec_HF=4,
                        winlen_sec_LF=args.winlen)
 
