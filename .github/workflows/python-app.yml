@@ -23,6 +23,7 @@ jobs:
     - name: Install dependencies
       run: |
         # python -m pip install --upgrade pip
+        conda init
         conda env create -f dailyspec.yml
         pip install flake8 pytest
         
