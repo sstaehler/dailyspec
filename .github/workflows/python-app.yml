@@ -24,7 +24,7 @@ jobs:
       run: |
         # python -m pip install --upgrade pip
         conda init bash
-        conda env create -f dailyspec.yml  --name base
+        conda env update -f dailyspec.yml  --name base
         pip install flake8 pytest
         
     - name: Lint with flake8
