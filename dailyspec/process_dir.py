@@ -15,7 +15,7 @@ def define_arguments():
     parser = ArgumentParser(description=helptext)
 
     helptext = 'Data files'
-    parser.add_argument('-d', '--directory', nargs='+', help=helptext)
+    parser.add_argument('-d', '--directory', help=helptext)
 
     helptext = 'Inventory file'
     parser.add_argument('-i', '--inventory_file', help=helptext)
@@ -75,7 +75,7 @@ def main():
     network, station, location, channel = args.seed_id.split('.')
 
     for iday in tqdm(range(args.jday_start, args.jday_end)):
-        fnam = pjoin(network, station, f'{channel}.D',
+        fnam = pjoin(year, args.directory, network, station, f'{channel}.D',
                      f'{network}.{station}.{location}.{channel}.D.{args.year:4d}.{iday:03d}')
 
         st = obspy.read(fnam)
@@ -107,14 +107,13 @@ def main():
             # print('LF samp rate ', st_LF[0].stats.sampling_rate, ' decimating')
             st_LF.decimate(2)
 
-        fnam = f"spec_{network}.{station}.{location}.{channel}_{args.year}.{iday}.png"
+        fnam = f"spec_{network}.{station}.{location}.{channel}_{args.year}.{iday:03d}.png"
         calc_specgram_dual(st_LF=st_LF,
                            st_HF=st.copy(),
                            fnam=fnam, show=args.interactive,
                            kind=args.kind,
                            fmax=args.fmax,
                            vmin=args.dBmin, vmax=args.dBmax,
-                           tstart=args.tstart, tend=args.tend,
                            noise='Earth',
                            overlap=0.8,
                            ratio_LF_spec=args.plot_ratio,
