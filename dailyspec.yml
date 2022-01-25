@@ -4,7 +4,9 @@ channels:
   - defaults
 dependencies:
   - matplotlib
-  - numpy
+  - numpy==1.21
   - obspy >=1.2
-  - python >=3.6
+  - python ==3.8
   - scipy
+  - ipython
+  - flake8
