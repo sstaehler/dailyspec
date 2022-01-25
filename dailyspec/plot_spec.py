@@ -34,6 +34,9 @@ def define_arguments():
                              '(in any format that datetime understands)')
     parser.add_argument('--tend', default=None,
                         help='End time for spectrogram')
+    parser.add_argument('--plot_ratio', default=0.6, type=float,
+                        help='Window length for long-period spectrogram (in '
+                             'seconds)')
     parser.add_argument('--winlen', default=100., type=float,
                         help='Window length for long-period spectrogram (in '
                              'seconds)')
@@ -106,6 +109,7 @@ def main():
                        tstart=args.tstart, tend=args.tend,
                        noise='Earth',
                        overlap=0.8,
+                       ratio_LF_spec=args.plot_ratio,
                        catalog=cat,
                        winlen_sec_HF=4,
                        winlen_sec_LF=args.winlen)
