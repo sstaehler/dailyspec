@@ -60,7 +60,7 @@ def define_arguments():
 def main():
     args = define_arguments()
 
-    from .spectrogram import calc_specgram_dual
+    from spectrogram import calc_specgram_dual
     import obspy
 
     st = obspy.Stream()

@@ -280,8 +280,6 @@ def calc_specgram_dual(st_LF, st_HF,
                 p, f, t = plot_cwf(tr, w0=12,
                                    fmin=flim[0],
                                    fmax=flim[1])
-            print(len(f))
-            print(tr)
             if len(f) > 200:
                 df = 4
             else:

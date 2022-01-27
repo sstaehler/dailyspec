@@ -34,7 +34,7 @@ def define_arguments():
 
     return args
 
-def produce_cycler(year, jday_start, jday_end, seed_id):
+def produce_cycler(year, jday_start, jday_end, seed_id, fnam_out):
     import os.path as path
 
     mydir = path.dirname(path.abspath(__file__))
@@ -52,13 +52,14 @@ def produce_cycler(year, jday_start, jday_end, seed_id):
         str_all += str_fnam
     str_all += str_bottom
 
-    with open(f'overview_{seed_id}.html', 'w') as f:
+    with open(fnam_out, 'w') as f:
         f.write(str_all)
 
 
 def main():
     args = define_arguments()
-    produce_cycler(args.year, args.jday_start, args.jday_end, args.seed_id)
+    produce_cycler(args.year, args.jday_start, args.jday_end, args.seed_id,
+                   fnam_out=f'overview_{args.seed_id}.html')
 
 
 if __name__=='__main__':

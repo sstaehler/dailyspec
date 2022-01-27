@@ -7,10 +7,9 @@
 :license:
     None
 """
-from argparse import ArgumentParser
-
 
 def define_arguments():
+    from argparse import ArgumentParser
     helptext = 'Plot spectogram of data'
     parser = ArgumentParser(description=helptext)
 
@@ -22,6 +21,9 @@ def define_arguments():
 
     helptext = 'Channel name (SEED snippet, e.g. CH.ROTHE..HHZ)'
     parser.add_argument('-s', '--seed_id', help=helptext)
+
+    helptext = 'Text file with list of channel names (SEED snippet, e.g. CH.ROTHE..HHZ)'
+    parser.add_argument('-l', '--list_seed_ids', help=helptext)
 
     helptext = 'Catalog file'
     parser.add_argument('-c', '--catalog_file', help=helptext, default=None)
@@ -56,69 +58,93 @@ def define_arguments():
 
 def main():
     args = define_arguments()
+    if args.list_seed_ids is None and args.seed_id is None:
+        raise ValueError('Either seed_id or list_seed_ids needs to be set')
 
     from .spectrogram import calc_specgram_dual
+    from .produce_cycler import produce_cycler
     import obspy
     from os.path import join as pjoin
     from os.path import exists as pexists
+    from os import makedirs as mkdir
     from tqdm import tqdm
 
-    network, station, location, channel = args.seed_id.split('.')
+    if args.list_seed_ids is not None:
+        with open(args.list_seed_ids, 'r') as f:
+            seed_ids = f.read().splitlines()
+    else:
+        seed_ids = [args.seed_id]
 
-    for iday in tqdm(range(args.jday_start, args.jday_end)):
-        fnam_mseed = pjoin(args.directory, f'{args.year:4d}', network, station,
-                f'{channel}.D',
-                f'{network}.{station}.{location}.{channel}.D.{args.year:4d}.{iday:03d}')
-        fnam_out = f"./spec_{network}.{station}.{location}.{channel}_{args.year}.{iday:03d}.png"
+    for seed_id in seed_ids:
+        dir_out = f'fig_{seed_id}'
+        mkdir(dir_out, exist_ok=True)
+        network, station, location, channel = seed_id.split('.')
 
-        if pexists(fnam_mseed) and not pexists(fnam_out):
-            st = obspy.read(fnam_mseed)
-            st.merge(method=1, fill_value='interpolate')
-            samp_rate_original = st[0].stats.sampling_rate
-            if samp_rate_original > args.fmax * 10 and samp_rate_original % 5 == 0.:
-                st.decimate(5)
-            while st[0].stats.sampling_rate > 4. * args.fmax:
-                st.decimate(2)
+        iday_start = 366
+        iday_end = 0
+        for iday in tqdm(range(args.jday_start, args.jday_end)):
+            fnam_mseed = pjoin(args.directory, f'{args.year:4d}', network, station,
+                               f'{channel}.D',
+                               f'{network}.{station}.{location}.{channel}.D.{args.year:4d}.{iday:03d}')
+            fnam_out = pjoin(dir_out,
+                             f"spec_{network}.{station}.{location}.{channel}_{args.year}.{iday:03d}.png")
 
-            inv = obspy.read_inventory(args.inventory_file)
-            if args.catalog_file is not None:
-                cat = obspy.read_events(args.catalog_file)
-            else:
-                cat = None
+            if pexists(fnam_mseed):
+                iday_start = min(iday, iday_start)
+                iday_end = max(iday, iday_end)
 
-            for tr in st:
-                coords = inv.get_coordinates(tr.get_id())
-                tr.stats.latitude = coords['latitude']
-                tr.stats.longitude = coords['longitude']
-                tr.stats.elevation = coords['elevation']
+            if pexists(fnam_mseed) and not pexists(fnam_out):
+                st = obspy.read(fnam_mseed)
+                st.merge(method=1, fill_value='interpolate')
+                samp_rate_original = st[0].stats.sampling_rate
+                if samp_rate_original > args.fmax * 10 and samp_rate_original % 5 == 0.:
+                    st.decimate(5)
+                while st[0].stats.sampling_rate > 4. * args.fmax:
+                    st.decimate(2)
 
-            st.remove_response(inventory=inv, output='ACC')
+                inv = obspy.read_inventory(args.inventory_file)
+                if args.catalog_file is not None:
+                    cat = obspy.read_events(args.catalog_file)
+                else:
+                    cat = None
 
-            # The computation of the LF spectrograms with long time windows or even CWT
-            # can be REALLY slow, thus, decimate it to anything larger 2.5 Hz
-            st_LF = st.copy()
-            while st_LF[0].stats.sampling_rate > 4.:
-                # print('LF samp rate ', st_LF[0].stats.sampling_rate, ' decimating')
-                st_LF.decimate(2)
+                for tr in st:
+                    coords = inv.get_coordinates(tr.get_id())
+                    tr.stats.latitude = coords['latitude']
+                    tr.stats.longitude = coords['longitude']
+                    tr.stats.elevation = coords['elevation']
 
-            tstart = float(obspy.UTCDateTime(f'{args.year:4d}0101T00:00:00Z')) \
-                    + 86400. * (iday - 1) - 20.
-            tend = float(obspy.UTCDateTime(f'{args.year:4d}0101T00:00:00Z')) \
-                    + 86400. * iday + 20.
-            calc_specgram_dual(st_LF=st_LF,
-                               st_HF=st.copy(),
-                               fnam=fnam_out,
-                               kind=args.kind,
-                               fmax=args.fmax,
-                               tstart=tstart, tend=tend,
-                               vmin=args.dBmin, vmax=args.dBmax,
-                               noise='Earth',
-                               overlap=0.8,
-                               ratio_LF_spec=args.plot_ratio,
-                               catalog=cat,
-                               winlen_sec_HF=4,
-                               winlen_sec_LF=args.winlen)
+                st.remove_response(inventory=inv, output='ACC')
 
+                # The computation of the LF spectrograms with long time windows or even CWT
+                # can be REALLY slow, thus, decimate it to anything larger 2.5 Hz
+                st_LF = st.copy()
+                while st_LF[0].stats.sampling_rate > 4.:
+                    # print('LF samp rate ', st_LF[0].stats.sampling_rate, ' decimating')
+                    st_LF.decimate(2)
+
+                tstart = float(obspy.UTCDateTime(f'{args.year:4d}0101T00:00:00Z')) \
+                         + 86400. * (iday - 1) - 20.
+                tend = float(obspy.UTCDateTime(f'{args.year:4d}0101T00:00:00Z')) \
+                       + 86400. * iday + 20.
+                calc_specgram_dual(st_LF=st_LF,
+                                   st_HF=st.copy(),
+                                   fnam=fnam_out,
+                                   kind=args.kind,
+                                   fmax=args.fmax,
+                                   tstart=tstart, tend=tend,
+                                   vmin=args.dBmin, vmax=args.dBmax,
+                                   noise='Earth',
+                                   overlap=0.8,
+                                   ratio_LF_spec=args.plot_ratio,
+                                   catalog=cat,
+                                   winlen_sec_HF=4,
+                                   winlen_sec_LF=args.winlen)
+        produce_cycler(year=args.year,
+                       jday_start=iday_start,
+                       jday_end=iday_end,
+                       seed_id=seed_id,
+                       fnam_out=pjoin(dir_out, 'overview.html'))
 
 if __name__ == '__main__':
     main()
