@@ -54,7 +54,7 @@ def mark_event(ax_low: matplotlib.pyplot.Axes,
     from matplotlib.transforms import blended_transform_factory
 
     model = TauPyModel('iasp91')
-    cat_trim = catalog.filter("magnitude >= 4.8",
+    cat_trim = catalog.filter("magnitude >= 5.0",
                               "time >= %s" % (starttime - 3600),
                               "time < %s" % (endtime - 120))
     nevents = len(cat_trim)
@@ -88,10 +88,10 @@ def mark_event(ax_low: matplotlib.pyplot.Axes,
                        ha='left', va='center',
                        fontsize=8)
         ax_up.annotate(text=str(ievent),
-                       xy=(x_event_label - 0.010, y_event_label),
+                       xy=(x_event_label - 0.005, y_event_label),
                        xycoords=fig.transFigure,
                        textcoords=fig.transFigure,
-                       ha='left', va='center',
+                       ha='right', va='center',
                        bbox=bbox, fontsize=10)
 
         ax_up.annotate(
@@ -125,7 +125,7 @@ def mark_event(ax_low: matplotlib.pyplot.Axes,
                                    fontsize=8,
                                    ha='center', va='bottom',
                                    #text=arrival.name)
-                                   text='R')
+                                   text='R1')
                     # ax.annotate(
                     #     text='', #f'display = ({t_arrival_t:.1f}, {ydisplay:.1f}), {arrival.name}',
                     #     xy=(t_arrival_t, -5), xycoords='axes pixels',
@@ -141,7 +141,16 @@ def mark_event(ax_low: matplotlib.pyplot.Axes,
                                    textcoords=trans,
                                    fontsize=8,
                                    ha='center', va='bottom',
-                                   text='R')
+                                   text='R1')
+                elif 180 < arrival.purist_distance < 270. and arrival.name in ['P', 'S', '3.5kmps']:
+                    ax_low.axvline(x=t_arrival.datetime, c='lightgrey', lw=0.5)
+                    ax_up.axvline(x=t_arrival.datetime, c='lightgrey', lw=0.5)
+                    ax_up.annotate(xy=(date2num(t_arrival.datetime), 0.83),
+                                   xycoords=trans,
+                                   textcoords=trans,
+                                   fontsize=8,
+                                   ha='center', va='bottom',
+                                   text='R2')
                                    # text=arrival.name)
                     # ax.annotate(
                     #     text='', #f'display = ({t_arrival_t:.1f}, {ydisplay:.1f}), {arrival.name}',
@@ -268,14 +277,19 @@ def calc_specgram_dual(st_LF, st_HF,
                                         noverlap=int(winlen * overlap),
                                         pad_to=next_pow_2(winlen) * 4)
             else:
-                df = 2
-                dt = 4
                 p, f, t = plot_cwf(tr, w0=12,
                                    fmin=flim[0],
                                    fmax=flim[1])
-                p = p[::df, ::dt]
-                f = f[::df]
-                t = t[::dt]
+            print(len(f))
+            print(tr)
+            if len(f) > 200:
+                df = 4
+            else:
+                df = 2
+            dt = 8
+            p = p[::df, ::dt]
+            f = f[::df]
+            t = t[::dt]
 
             t += float(tr.stats.starttime)
             delta = t[1] - t[0]
@@ -330,7 +344,7 @@ def calc_specgram_dual(st_LF, st_HF,
             plt.show()
     else:
         plt.show()
-    plt.close()
+    plt.close('all')
 
 
 def plt_earth_noise(ax_psd):
