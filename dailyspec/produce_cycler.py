@@ -34,7 +34,36 @@ def define_arguments():
 
     return args
 
-def produce_cycler(year, jday_start, jday_end, seed_id, fnam_out):
+def produce_cycler_per_day(year, jday_start, jday_end, seed_ids,
+        dir_image, dir_out):
+    from os.path import join as pjoin
+    import os.path as path
+    from os import makedirs as mkdir
+
+    mydir = path.dirname(path.abspath(__file__))
+    with open(pjoin(mydir, 'data/string_head.txt'), 'r') as f:
+        str_head = f.read()
+    with open(pjoin(mydir, 'data/string_bottom.txt'), 'r') as f:
+        str_bottom = f.read()
+    for iday in range(jday_start, jday_end):
+        str_all = str_head
+        for seed_id in seed_ids:
+            network, station, location, channel = seed_id.split('.')
+            fnam = pjoin(dir_image, f'fig_{seed_id}',
+                    f"spec_{network}.{station}.{location}.{channel}_{year}.{iday:03d}.png")
+            str_fnam = f'<div class="mySlides img-magnifier-container">\n' \
+                       f'<H1>{seed_id} {year}.{iday:03d}</H1>\n' \
+                       f' <img id="myimage" src="{fnam}" style="width:100%">\n' \
+                       f'</div>\n\n'
+            str_all += str_fnam
+        str_all += str_bottom
+        dir_out_sol = pjoin(dir_out, f'{year:04d}_jday_{iday:03d}')
+        mkdir(dir_out_sol, exist_ok=True)
+        with open(pjoin(dir_out_sol, 'index.html'), 'w') as f:
+            f.write(str_all)
+
+
+def produce_cycler_per_channel(year, jday_start, jday_end, seed_id, fnam_out):
     import os.path as path
 
     mydir = path.dirname(path.abspath(__file__))
@@ -46,9 +75,10 @@ def produce_cycler(year, jday_start, jday_end, seed_id, fnam_out):
     for iday in range(jday_start, jday_end):
         network, station, location, channel = seed_id.split('.')
         fnam = f"spec_{network}.{station}.{location}.{channel}_{year}.{iday:03d}.png"
-        str_fnam = f'<div class="mySlides img-magnifier-container">' \
-                   f' <img id="myimage" src="{fnam}" style="width:100%">' \
-                   f' </div>'
+        str_fnam = f'<div class="mySlides img-magnifier-container">\n' \
+                   f'<H1>{seed_id} {year}.{iday:03d}</H1>\n' \
+                   f' <img id="myimage" src="{fnam}" style="width:100%">\n' \
+                   f'</div>\n\n'
         str_all += str_fnam
     str_all += str_bottom
 

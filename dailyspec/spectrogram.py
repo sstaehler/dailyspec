@@ -27,11 +27,11 @@ from obspy.signal.util import next_pow_2
 plt.rcParams['agg.path.chunksize'] = 1000
 mstyle.use('seaborn-colorblind')
 
-def plot_cwf(tr, fmin=1. / 50, fmax=1. / 2, w0=8):
+def plot_cwf(tr, fmin=1. / 50, fmax=1. / 2, w0=8, nf=200):
     npts = tr.stats.npts
     dt = tr.stats.delta
 
-    scalogram = abs(cwt(tr.data, dt, w0=w0, nf=200,
+    scalogram = abs(cwt(tr.data, dt, w0=w0, nf=nf,
                         fmin=fmin, fmax=fmax))
 
     t = np.linspace(0, dt * npts, npts)
@@ -172,7 +172,8 @@ def calc_specgram_dual(st_LF, st_HF,
                        catalog=None,
                        show=False,
                        fnam=None,
-                       noise=None):
+                       noise=None,
+                       dpi=240):
     """
     Plot a dual spectrogram of a logarithmic low-frequency part and a linear high-frequency part above 1 Hz.
     :param st_LF: obspy.Stream
@@ -209,6 +210,8 @@ def calc_specgram_dual(st_LF, st_HF,
         File name to save spectrogram into.
     :param noise:
         Plot Earth noise model on the right.
+    :param dpi: float
+        Resolution of saved image (in dpi. Default results in 3840x2160)
     """
     if tstart is None:
         tstart = st_LF[0].stats.starttime
@@ -219,9 +222,12 @@ def calc_specgram_dual(st_LF, st_HF,
     else:
         tend = utct(tend)
 
+    print(st_LF)
+    print(st_HF)
+
     # Some input checking
     freq_HF = st_HF[0].stats.sampling_rate
-    if freq_HF <= 2.0:
+    if freq_HF < 2.0:
         raise KeyError('Sampling rate of HF data must be > 2sps, is %4.1fsps' %
                        freq_HF)
     winlen_LF = int(winlen_sec_LF * st_LF[0].stats.sampling_rate)
@@ -270,21 +276,25 @@ def calc_specgram_dual(st_LF, st_HF,
 
         for tr in st:
             # print(winlen / tr.stats.sampling_rate, tr.stats.sampling_rate)
+            print(tr)
+            nx = int(16. * dpi * 0.8)
+            ny = int(9. * dpi * 0.7 * 0.5)
             if (kind == 'cwt' and winlen / tr.stats.sampling_rate < 20.) or \
                     (kind == 'spec'):  # and winlen < 600 * tr.stats.sampling_rate):
                 p, f, t = mlab.specgram(tr.data, NFFT=winlen,
                                         Fs=tr.stats.sampling_rate,
                                         noverlap=int(winlen * overlap),
                                         pad_to=next_pow_2(winlen) * 4)
+                df = 1
             else:
-                p, f, t = plot_cwf(tr, w0=12,
+                p, f, t = plot_cwf(tr, w0=12, nf=ny//2,
                                    fmin=flim[0],
                                    fmax=flim[1])
-            if len(f) > 200:
-                df = 4
-            else:
-                df = 2
-            dt = 8
+                df = max(1, len(f) // ny)
+
+            print(nx, ny)
+            dt = max(1, len(t) // nx)
+            print(dt, df)
             p = p[::df, ::dt]
             f = f[::df]
             t = t[::dt]
@@ -388,9 +398,9 @@ def format_axes(ax_cb, ax_psd_HF, ax_psd_LF, ax_seis_HF, ax_seis_LF,
                 ):
     ax_seis_LF.set_ylim(st_LF[0].std() * 1e7 * np.asarray([-3., 1.]))
     ax_seis_HF.set_ylim(st_HF[0].std() * 1e7 * np.asarray([-2., 2.]))
-    ax_seis_LF.set_ylabel('%s [um/s²] \n< 1 Hz' % st_LF[0].stats.channel,
+    ax_seis_LF.set_ylabel('%s \n[µm/s²] < 1 Hz' % st_LF[0].get_id(),
                           color='navy')
-    ax_seis_HF.set_ylabel('%s [um/s] \n> 1 Hz' % st_HF[0].stats.channel,
+    ax_seis_HF.set_ylabel('%s \n[µm/s] > 1 Hz' % st_HF[0].get_id(),
                           color='darkred')
     ax_seis_LF.tick_params('y', colors='navy')
     ax_seis_HF.tick_params('y', colors='darkred')
@@ -404,10 +414,11 @@ def format_axes(ax_cb, ax_psd_HF, ax_psd_LF, ax_seis_HF, ax_seis_LF,
         ax.set_ylim(fmin_LF, fmax_LF)
         tickvals = np.asarray(
             [1. / 2, 1. / 5, 1. / 10, 1. / 20, 1. / 50, 1. / 100,
-             1. / 200., 1. / 500, 1. / 1000., 1. / 2000, 1. / 5000, 1. / 10000])
+             1. / 200., 1. / 500, 1. / 1000., 1. / 2000, 1. / 5000, 1. / 10000,
+             1. / 20000, 1./50000, 1./86400, 1./100000])
         ax.set_yticks(tickvals)  # [tickvals >= fmin_LF])
         ax.set_yticklabels(['2', '5', '10', '20', '50', '100', '200', '500',
-                            '1000', '2000', '5000', '10000'])
+                            '1000', '2000', '5000', '10000', '20k', '50k', '1 day', '100k'])
         ax.set_yticklabels([], minor=True)
     for ax_psd in [ax_psd_HF, ax_psd_LF]:
         ax_psd.yaxis.set_label_position("right")
@@ -442,16 +453,18 @@ def format_axes(ax_cb, ax_psd_HF, ax_psd_LF, ax_seis_HF, ax_seis_LF,
     #     ax.xaxis.set_minor_locator(mins)
 
 
-def create_axes(ratio_LF_height=0.6):
+def create_axes(ratio_LF_height=0.6, figsize=(16, 9)):
     """
     Create necessary axis objects
     :param ratio_LF_height: float
         Ratio of LF spectrograms height to total spectrogram height
+    :param figsize:  tuple
+        Figure size in inches
     :return: matplotlib.Axis
     """
-    fig = plt.figure(figsize=(16, 9))
-    # [left bottom width height]
+    fig = plt.figure(figsize=figsize)
 
+    # [left bottom width height]
     h_spec_total = 0.7
     h_base = 0.13
 

@@ -60,7 +60,7 @@ def define_arguments():
 def main():
     args = define_arguments()
 
-    from spectrogram import calc_specgram_dual
+    from .spectrogram import calc_specgram_dual
     import obspy
 
     st = obspy.Stream()
@@ -78,19 +78,22 @@ def main():
         t1 = obspy.UTCDateTime(args.tend) + 120.
         st.trim(t0, t1)
 
-    inv = obspy.read_inventory(args.inventory_file)
     if args.catalog_file is not None:
         cat = obspy.read_events(args.catalog_file)
     else:
         cat = None
 
-    for tr in st:
-        coords = inv.get_coordinates(tr.get_id())
-        tr.stats.latitude = coords['latitude']
-        tr.stats.longitude = coords['longitude']
-        tr.stats.elevation = coords['elevation']
+    if args.inventory_file is not None:
+        inv = obspy.read_inventory(args.inventory_file)
+        st.remove_response(inventory=inv, output='ACC')
 
-    st.remove_response(inventory=inv, output='ACC')
+        for tr in st:
+            coords = inv.get_coordinates(tr.get_id())
+            tr.stats.latitude = coords['latitude']
+            tr.stats.longitude = coords['longitude']
+            tr.stats.elevation = coords['elevation']
+    else:
+        st.differentiate()
 
     # The computation of the LF spectrograms with long time windows or even CWT
     # can be REALLY slow, thus, decimate it to anything larger 2.5 Hz
