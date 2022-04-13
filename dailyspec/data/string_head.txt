@@ -7,6 +7,14 @@
 * {box-sizing: border-box}
 body {font-family: Verdana, sans-serif; margin:0}
 
+h1 {
+   font-family: "Trebuchet MS", Arial, Helvetica, sans-serif;
+   color: navy;
+   margin-left: 14px;
+   text-align: center;
+}
+
+
 .img-magnifier-container {position: relative;}
 
 .img-magnifier-glass {
