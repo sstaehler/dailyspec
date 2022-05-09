@@ -11,6 +11,8 @@ Plot spectrograms in two different frequency channels
 
 import argparse
 from datetime import timedelta, datetime
+import matplotlib
+matplotlib.use('Qt5Agg')
 
 import matplotlib.dates as mdates
 import matplotlib.mlab as mlab
@@ -24,7 +26,7 @@ from obspy import UTCDateTime as utct
 from obspy.signal.tf_misfit import cwt
 from obspy.signal.util import next_pow_2
 
-plt.rcParams['agg.path.chunksize'] = 1000
+#plt.rcParams['agg.path.chunksize'] = 1000
 mstyle.use('seaborn-colorblind')
 
 def plot_cwf(tr, fmin=1. / 50, fmax=1. / 2, w0=8):
@@ -167,7 +169,8 @@ def calc_specgram_dual(st_LF, st_HF,
                        fmax=None,
                        overlap=0.5, kind='spec',
                        tstart=None, tend=None,
-                       vmin=None, vmax=None, log=True,
+                       vmin=None, vmax=None, w0=10,
+                       log=True,
                        ratio_LF_spec=0.6,
                        catalog=None,
                        show=False,
@@ -197,6 +200,8 @@ def calc_specgram_dual(st_LF, st_HF,
         Lower limit of colorbar
     :param vmax: float
         Upper limit of colorbar
+    :param w0: integer
+        Tradeoff parameter for time vs frequency resolution in cwt (higher: better f resolution)
     :param log: bool
         Plot spectrogram logarithmic (default) or linear
     :param ratio_LF_spec: float
@@ -277,7 +282,7 @@ def calc_specgram_dual(st_LF, st_HF,
                                         noverlap=int(winlen * overlap),
                                         pad_to=next_pow_2(winlen) * 4)
             else:
-                p, f, t = plot_cwf(tr, w0=12,
+                p, f, t = plot_cwf(tr, w0=w0,
                                    fmin=flim[0],
                                    fmax=flim[1])
             if len(f) > 200:

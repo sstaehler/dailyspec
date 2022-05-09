@@ -17,9 +17,9 @@ def define_arguments():
     parser.add_argument('-d', '--data_files', nargs='+', help=helptext)
 
     helptext = 'Inventory file'
-    parser.add_argument('-i', '--inventory_file', help=helptext)
+    parser.add_argument('-i', '--inventory_file', help=helptext, default=None)
 
-    helptext = 'Inventory file'
+    helptext = 'Catalog file'
     parser.add_argument('-c', '--catalog_file', help=helptext, default=None)
 
     helptext = 'Maximum frequency for plot'
@@ -39,6 +39,13 @@ def define_arguments():
                              'seconds)')
     parser.add_argument('--winlen', default=100., type=float,
                         help='Window length for long-period spectrogram (in '
+                             'seconds)')
+    parser.add_argument('--w0', default=10, type=int,
+                        help='Tradeoff between time and frequency resolution in CWT' + 
+                        'Lower numbers: better time resolution\n' + 
+                        'Higher numbers: better freq resolution')
+    parser.add_argument('--winlen_HF', default=4., type=float,
+                        help='Window length for high-frequency spectrogram (in '
                              'seconds)')
     parser.add_argument('--no_noise', default=False, action='store_true',
                         help='Omit plotting the NLNM/NHNM curves')
@@ -60,7 +67,7 @@ def define_arguments():
 def main():
     args = define_arguments()
 
-    from spectrogram import calc_specgram_dual
+    from .spectrogram import calc_specgram_dual
     import obspy
 
     st = obspy.Stream()
@@ -77,20 +84,21 @@ def main():
         t0 = obspy.UTCDateTime(args.tstart) - 120.
         t1 = obspy.UTCDateTime(args.tend) + 120.
         st.trim(t0, t1)
+    
+    if args.inventory_file is not None:
+        inv = obspy.read_inventory(args.inventory_file)
+        for tr in st:
+            coords = inv.get_coordinates(tr.get_id())
+            tr.stats.latitude = coords['latitude']
+            tr.stats.longitude = coords['longitude']
+            tr.stats.elevation = coords['elevation']
+        st.remove_response(inventory=inv, output='ACC')
 
-    inv = obspy.read_inventory(args.inventory_file)
     if args.catalog_file is not None:
         cat = obspy.read_events(args.catalog_file)
     else:
         cat = None
 
-    for tr in st:
-        coords = inv.get_coordinates(tr.get_id())
-        tr.stats.latitude = coords['latitude']
-        tr.stats.longitude = coords['longitude']
-        tr.stats.elevation = coords['elevation']
-
-    st.remove_response(inventory=inv, output='ACC')
 
     # The computation of the LF spectrograms with long time windows or even CWT
     # can be REALLY slow, thus, decimate it to anything larger 2.5 Hz
@@ -109,9 +117,10 @@ def main():
                        tstart=args.tstart, tend=args.tend,
                        noise='Earth',
                        overlap=0.8,
+                       w0=args.w0,
                        ratio_LF_spec=args.plot_ratio,
                        catalog=cat,
-                       winlen_sec_HF=4,
+                       winlen_sec_HF=args.winlen_HF,
                        winlen_sec_LF=args.winlen)
 
 
