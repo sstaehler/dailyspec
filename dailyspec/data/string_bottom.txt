@@ -5,7 +5,7 @@
 <br>
 
 <script>
-var slideIndex = 6;
+var slideIndex = 1;
 showSlides(slideIndex);
 magnify("myimage", 3);
 

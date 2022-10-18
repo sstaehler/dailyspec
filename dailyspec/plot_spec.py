@@ -54,6 +54,9 @@ def define_arguments():
                         help='Open a matplotlib window instead of saving to '
                              'disk')
 
+    parser.add_argument('--unit', default='VEL',
+                        help='Unit of input data. Options: ACC, VEL, DIS. Plot is in acceleration.')
+
     parser.add_argument('--kind', default='spec',
                         help='Calculate spectrogram (spec) or continuous '
                              'wavelet transfort (cwt, much slower)? Default: '
@@ -81,8 +84,8 @@ def main():
         st.decimate(2)
 
     if args.tstart is not None:
-        t0 = obspy.UTCDateTime(args.tstart) - 120.
-        t1 = obspy.UTCDateTime(args.tend) + 120.
+        t0 = obspy.UTCDateTime(args.tstart) - args.winlen*1.5
+        t1 = obspy.UTCDateTime(args.tend) + args.winlen*1.5
         st.trim(t0, t1)
     
     if args.inventory_file is not None:
@@ -93,21 +96,27 @@ def main():
             tr.stats.longitude = coords['longitude']
             tr.stats.elevation = coords['elevation']
         st.remove_response(inventory=inv, output='ACC')
+    else:
+        if args.unit=='VEL':
+            st.differentiate()
+        if args.unit=='DIS':
+            st.differentiate()
+            st.differentiate()
 
     if args.catalog_file is not None:
         cat = obspy.read_events(args.catalog_file)
     else:
         cat = None
 
-
     # The computation of the LF spectrograms with long time windows or even CWT
     # can be REALLY slow, thus, decimate it to anything larger 2.5 Hz
     st_LF = st.copy()
     while st_LF[0].stats.sampling_rate > 4.:
-        # print('LF samp rate ', st_LF[0].stats.sampling_rate, ' decimating')
         st_LF.decimate(2)
 
+    #if not args.fnam:
     fnam = "spec_{network}.{station}.{location}.{channel}.png".format(**st_LF[0].stats)
+
     calc_specgram_dual(st_LF=st_LF,
                        st_HF=st.copy(),
                        fnam=fnam, show=args.interactive,
