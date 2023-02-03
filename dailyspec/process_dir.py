@@ -118,22 +118,16 @@ def main():
                 else:
                     st.differentiate()
 
-                # samp_rate_original = st[0].stats.sampling_rate
-                # if samp_rate_original > args.fmax * 10 and samp_rate_original % 5 == 0.:
-                #     st.decimate(5)
-                # while st[0].stats.sampling_rate > 4. * args.fmax:
-                #     st.decimate(2)
                 st.interpolate(sampling_rate=args.fmax * 2.,
                                method='nearest')
                 # The computation of the LF spectrograms with long time windows or even CWT
                 # can be REALLY slow, thus, decimate it to anything larger 2.5 Hz
                 st_LF = st.copy()
                 st_LF.filter('lowpass', freq=0.95, corners=16)
-                # while st_LF[0].stats.sampling_rate > 4.:
-                #     # print('LF samp rate ', st_LF[0].stats.sampling_rate, ' decimating')
-                #     st_LF.decimate(2)
+
+                # For LF, 2 Hz is enough
                 st_LF.interpolate(sampling_rate=2.,
-                               method='nearest')
+                                  method='nearest')
 
                 tstart = float(obspy.UTCDateTime(f'{args.year:4d}0101T00:00:00Z')) \
                          + 86400. * (iday - 1) - 20.

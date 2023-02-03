@@ -9,21 +9,19 @@
 
 """
 
-from matplotlib import use as mpl_use
-import os
 import logging
 
 # from .spectrogram import calc_specgram_dual
 # Set matplotlib logging level and backend
 logging.getLogger("matplotlib").setLevel(logging.INFO)
-try:
-    os.environ["DISPLAY"]
-    mpl_use("Qt5Agg")
-except KeyError:
-    mpl_use("Agg")
+# try:
+#     os.environ["DISPLAY"]
+#     mpl_use("Qt5Agg")
+# except KeyError:
+# mpl_use("Agg")
 
 name = "dailyspec"
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __description__ = """Tool to efficiently plot spectrograms of longer seismic datasets."""
 __license__ = "GPLv3"
 __author__ = "Simon Stähler"
