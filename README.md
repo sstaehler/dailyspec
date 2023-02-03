@@ -4,6 +4,28 @@
 
 Plot clean spectrograms of longer seismic time series
 
+## Installation:
+
+As usual, it's easiest to use anaconda. If you already have an environment with the typical seismology packages
+
+```
+    matplotlib
+    numpy
+    obspy 
+    python 
+    scipy
+    cartopy
+```
+
+installed, you're set.
+Otherwise, create yourself an environment with
+
+```shell
+conda env create -f dailyspec.yml
+conda activate dailyspec
+pip install -e .
+```
+
 ## Examples:
 
 ### Single seismogram

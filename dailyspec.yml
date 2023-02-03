@@ -5,8 +5,9 @@ channels:
 dependencies:
   - matplotlib
   - numpy==1.21
-  - obspy >=1.2
-  - python ==3.8
+  - obspy>=1.2
+  - python==3.8
   - scipy
   - ipython
   - flake8
+  - cartopy
