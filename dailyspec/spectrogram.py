@@ -11,8 +11,6 @@ Plot spectrograms in two different frequency channels
 
 import argparse
 from datetime import timedelta, datetime
-import matplotlib
-# matplotlib.use('Qt5Agg')
 
 import matplotlib.dates as mdates
 import matplotlib.mlab as mlab
@@ -21,13 +19,15 @@ import matplotlib.pyplot as plt
 import matplotlib.style as mstyle
 import numpy as np
 import obspy
-from matplotlib.patches import Polygon
 from obspy import UTCDateTime as utct
 from obspy.signal.tf_misfit import cwt
 from obspy.signal.util import next_pow_2
 
-#plt.rcParams['agg.path.chunksize'] = 1000
+#  matplotlib.use('Qt5Agg')
+
+# plt.rcParams['agg.path.chunksize'] = 1000
 mstyle.use('seaborn-colorblind')
+
 
 def plot_cwf(tr, fmin=1. / 50, fmax=1. / 2, w0=8, nf=200):
     npts = tr.stats.npts
@@ -99,17 +99,16 @@ def mark_event(ax_low: matplotlib.pyplot.Axes,
         ax_up.annotate(
             text=str(ievent),
             xy=(date2num(origin.time.datetime), 0.83),
-            xycoords=trans, #ax.get_xaxis_transform(),
-            textcoords=trans, #ax.get_xaxis_transform(),
+            xycoords=trans,
+            textcoords=trans,
             ha='center', va='bottom',
             fontsize=8,
-            #rotation=270.,
             annotation_clip=True,
             bbox=bbox)
 
         if 'longitude' in stats:
             arrivals = model.get_travel_times_geo(
-                source_depth_in_km=origin.depth*1e-3,
+                source_depth_in_km=origin.depth * 1e-3,
                 source_latitude_in_deg=origin.latitude,
                 source_longitude_in_deg=origin.longitude,
                 receiver_latitude_in_deg=stats.latitude,
@@ -126,7 +125,7 @@ def mark_event(ax_low: matplotlib.pyplot.Axes,
                                    textcoords=trans,
                                    fontsize=8,
                                    ha='center', va='bottom',
-                                   #text=arrival.name)
+                                   # text=arrival.name)
                                    text='R1')
                     # ax.annotate(
                     #     text='', #f'display = ({t_arrival_t:.1f}, {ydisplay:.1f}), {arrival.name}',
@@ -153,7 +152,7 @@ def mark_event(ax_low: matplotlib.pyplot.Axes,
                                    fontsize=8,
                                    ha='center', va='bottom',
                                    text='R2')
-                                   # text=arrival.name)
+                    # text=arrival.name)
                     # ax.annotate(
                     #     text='', #f'display = ({t_arrival_t:.1f}, {ydisplay:.1f}), {arrival.name}',
                     #     xy=(t_arrival_t, -5), xycoords='axes pixels',
@@ -176,6 +175,7 @@ def calc_specgram_dual(st_LF, st_HF,
                        show=False,
                        fnam=None,
                        noise=None,
+                       figsize=(16., 9.),
                        dpi=240):
     """
     Plot a dual spectrogram of a logarithmic low-frequency part and a linear high-frequency part above 1 Hz.
@@ -215,6 +215,8 @@ def calc_specgram_dual(st_LF, st_HF,
         File name to save spectrogram into.
     :param noise:
         Plot Earth noise model on the right.
+    :param figsize:
+        Size of output figure in inches
     :param dpi: float
         Resolution of saved image (in dpi. Default results in 3840x2160)
     """
@@ -253,22 +255,24 @@ def calc_specgram_dual(st_LF, st_HF,
                  zerophase=True, corners=6)
 
     fig, ax_cb, ax_psd_HF, ax_psd_LF, \
-    ax_seis_HF, ax_seis_LF, \
-    ax_spec_HF, ax_spec_LF, = create_axes(ratio_LF_height=ratio_LF_spec)
+        ax_seis_HF, ax_seis_LF, \
+        ax_spec_HF, ax_spec_LF, = create_axes(ratio_LF_height=ratio_LF_spec,
+                                              figsize=figsize)
 
     for tr in st_LF:
         t = np.arange(utct(tr.stats.starttime).datetime,
                       utct(tr.stats.endtime + tr.stats.delta).datetime,
                       timedelta(seconds=tr.stats.delta)).astype(datetime)
         ax_seis_LF.plot(t, tr.data * 1e6,
-                        'navy', lw=0.3)
+                        'navy', lw=0.4, label='< 1 Hz')
+    ax_seis_LF.legend(loc='lower left', fontsize=9, edgecolor='navy', labelcolor='navy')
     for tr in st_HF:
         t = np.arange(utct(tr.stats.starttime).datetime,
                       utct(tr.stats.endtime + tr.stats.delta).datetime,
                       timedelta(seconds=tr.stats.delta)).astype(datetime)
         ax_seis_HF.plot(t, tr.data * 1e6,
-                        'darkred', lw=0.3)
-
+                        'darkred', lw=0.4, label='> 1 Hz')
+    ax_seis_HF.legend(loc='lower right', fontsize=9, edgecolor='darkred', labelcolor='darkred')
     for st, ax_spec, ax_psd, flim, winlen, cmap, vlim in \
             zip([st_LF, st_HF],
                 [ax_spec_LF, ax_spec_HF],
@@ -292,8 +296,8 @@ def calc_specgram_dual(st_LF, st_HF,
                                         pad_to=next_pow_2(winlen) * 4)
                 df = 1
             else:
-                p, f, t = plot_cwf(tr, w0=w0, 
-                                   nf=ny//2,
+                p, f, t = plot_cwf(tr, w0=w0,
+                                   nf=ny // 2,
                                    fmin=flim[0],
                                    fmax=flim[1])
                 df = max(1, len(f) // ny)
@@ -363,19 +367,8 @@ def calc_specgram_dual(st_LF, st_HF,
 def plt_earth_noise(ax_psd):
     nhnm = obspy.signal.spectral_estimation.get_nhnm()
     nlnm = obspy.signal.spectral_estimation.get_nlnm()
-    ix = nlnm[1]
-    iy = 1. / nlnm[0]
-    verts = [(-300, 1. / nlnm[0][0])] + list(zip(ix, iy)) + [
-        (-300, 1. / nlnm[0][-1])]
-    poly = Polygon(verts, facecolor='0.9', edgecolor='0.5')
-    ax_psd.add_patch(poly)
-    ix = nhnm[1]
-    iy = 1. / nhnm[0]
-    verts = [(0, 1. / nhnm[0][0])] + list(zip(ix, iy)) + [(0, 1. / nhnm[0][-1])]
-    poly = Polygon(verts, facecolor='0.9', edgecolor='0.5')
-    ax_psd.add_patch(poly)
-    ax_psd.plot(nhnm[1], 1. / nhnm[0], color='darkgrey', linestyle='dashed')
-    ax_psd.plot(nlnm[1], 1. / nlnm[0], color='darkgrey', linestyle='dashed')
+    ax_psd.fill_betweenx(y=1. / nlnm[0], x1=-300 * np.ones_like(nlnm[1]), x2=nlnm[1], color='lightgrey')
+    ax_psd.fill_betweenx(y=1. / nhnm[0], x2=300 * np.ones_like(nhnm[1]), x1=nhnm[1], color='lightgrey')
 
 
 def plot_psd(ax_psd, bol, f, p):
@@ -396,25 +389,28 @@ def plot_psd(ax_psd, bol, f, p):
                 color='indigo', linestyle='dotted')
 
 
-def format_axes(ax_cb, ax_psd_HF, ax_psd_LF, ax_seis_HF, ax_seis_LF,
-                ax_spec_HF, ax_spec_LF, fmax_HF,
-                fmax_LF, fmin_HF, fmin_LF, st_HF, st_LF,
-                tstart, tend, dBmax
+def format_axes(ax_cb: plt.Axes,
+                ax_psd_HF: plt.Axes, ax_psd_LF: plt.Axes, ax_seis_HF: plt.Axes, ax_seis_LF: plt.Axes,
+                ax_spec_HF: plt.Axes, ax_spec_LF: plt.Axes, fmax_HF: plt.Axes,
+                fmax_LF: float, fmin_HF: float, fmin_LF: float, st_HF: obspy.Stream, st_LF: obspy.Stream,
+                tstart: datetime, tend: datetime, dBmax: float
                 ):
     # ax_seis_LF.set_ylim(st_LF[0].std() * 1e7 * np.asarray([-3., 1.]))
     # ax_seis_HF.set_ylim(st_HF[0].std() * 1e7 * np.asarray([-2., 2.]))
-    ax_seis_LF.set_ylim(10**(dBmax/20) * 1e6 * np.asarray([-3., 1.]))
-    ax_seis_HF.set_ylim(10**(dBmax/20) * 1e6 * np.asarray([-2., 2.]))
-    ax_seis_LF.set_ylabel('%s \n[µm/s²] < 1 Hz' % st_LF[0].get_id(),
+    ax_seis_LF.set_ylim(10 ** (dBmax / 20) * 1e6 * np.asarray([-3., 1.]))
+    ax_seis_HF.set_ylim(10 ** (dBmax / 20) * 1e6 * np.asarray([-2., 2.]))
+    ax_seis_LF.set_ylabel('%s \n[µm/s²]' % st_LF[0].get_id(),
                           color='navy')
+    '''
     ax_seis_HF.set_ylabel('%s \n[µm/s] > 1 Hz' % st_HF[0].get_id(),
                           color='darkred')
+                          '''
     ax_seis_LF.tick_params('y', colors='navy')
     ax_seis_HF.tick_params('y', colors='darkred')
     ax_spec_HF.set_ylim(fmin_HF, fmax_HF)
-    ax_spec_HF.set_ylabel('frequency / Hz', fontsize=12)
+    ax_spec_HF.set_ylabel('Frequency [Hz]', fontsize=12)
     ax_spec_LF.set_yscale('log')
-    ax_spec_LF.set_ylabel('period / seconds', fontsize=12)
+    ax_spec_LF.set_ylabel('Period [s]', fontsize=12)
     # This needs to be done for both axes, otherwise the PSD and the Spec axis
     # plot weird yticks on top of each other
     for ax in [ax_spec_LF, ax_psd_LF]:
@@ -422,7 +418,7 @@ def format_axes(ax_cb, ax_psd_HF, ax_psd_LF, ax_seis_HF, ax_seis_LF,
         tickvals = np.asarray(
             [1. / 2, 1. / 5, 1. / 10, 1. / 20, 1. / 50, 1. / 100,
              1. / 200., 1. / 500, 1. / 1000., 1. / 2000, 1. / 5000, 1. / 10000,
-             1. / 20000, 1./50000, 1./86400, 1./100000])
+             1. / 20000, 1. / 50000, 1. / 86400, 1. / 100000])
         ax.set_yticks(tickvals)  # [tickvals >= fmin_LF])
         ax.set_yticklabels(['2', '5', '10', '20', '50', '100', '200', '500',
                             '1000', '2000', '5000', '10000', '20k', '50k', '1 day', '100k'])
@@ -432,13 +428,14 @@ def format_axes(ax_cb, ax_psd_HF, ax_psd_LF, ax_seis_HF, ax_seis_LF,
         ax_psd.yaxis.set_ticks_position("right")
     ax_psd_LF.set_ylim(fmin_LF, fmax_LF)
 
-    ax_psd_LF.set_xlabel('PSD (m/s²)²/Hz [dB]')
-    ax_psd_LF.set_ylabel('period / seconds', fontsize=12)
-    ax_psd_HF.set_ylabel('frequency / Hz', fontsize=12)
+    ax_psd_LF.set_xlabel('PSD [dB]')
+    ax_psd_LF.set_ylabel('Period [s]', fontsize=12, rotation=270., va='bottom')
+    ax_psd_HF.set_ylabel('Frequency [Hz]', fontsize=12, rotation=270., va='bottom')
     ax_psd_HF.set_xticks([])
     # make unnecessary labels disappear
     for ax in [ax_spec_HF, ax_seis_LF]:
         plt.setp(ax.get_xticklabels(), visible=False)
+        ax.set_xlabel('')
 
     for ax in [ax_spec_HF, ax_spec_LF, ax_seis_LF]:
         ax.set_xlim(tstart.datetime, tend.datetime)
@@ -446,12 +443,16 @@ def format_axes(ax_cb, ax_psd_HF, ax_psd_LF, ax_seis_HF, ax_seis_LF,
     # Axis with colorbar
     mappable = ax_spec_HF.collections[0]
     plt.colorbar(mappable=mappable, cax=ax_cb)
-    ax_cb.set_ylabel('PSD (m/s²)²/Hz')
+    ax_cb.set_ylabel('PSD [dB]', rotation=270., va='bottom')
 
     locator = mdates.AutoDateLocator(minticks=9, maxticks=14)
     formatter = mdates.ConciseDateFormatter(locator)
     ax_spec_LF.xaxis.set_major_locator(locator)
     ax_spec_LF.xaxis.set_major_formatter(formatter)
+    ax_spec_LF.set_xticks(ax_spec_LF.get_xticks()[:-1])
+    ax_spec_HF.xaxis.offsetText.get_text()
+    ax_spec_HF.xaxis.offsetText.set_text('')
+    ax_spec_HF.xaxis.offsetText.set_visible(False)
     # hours = mdates.HourLocator()
     # mins = mdates.MinuteLocator(interval=10)
     # # format the ticks
@@ -478,8 +479,8 @@ def create_axes(ratio_LF_height=0.6, figsize=(16, 9)):
     h_spec_LF = h_spec_total * ratio_LF_height
     h_spec_HF = h_spec_total - h_spec_LF
     h_seis = 0.15  # 0.2
-    w_base = 0.06
-    w_spec = 0.8
+    w_base = 0.08
+    w_spec = 0.77
     w_psd = 0.1
     ax_seis_LF = fig.add_axes([w_base, h_base + h_spec_total,
                                w_spec, h_seis],

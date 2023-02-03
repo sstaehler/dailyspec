@@ -41,9 +41,12 @@ def define_arguments():
                         help='Window length for long-period spectrogram (in '
                              'seconds)')
     parser.add_argument('--w0', default=10, type=int,
-                        help='Tradeoff between time and frequency resolution in CWT' + 
-                        'Lower numbers: better time resolution\n' + 
-                        'Higher numbers: better freq resolution')
+                        help='Tradeoff between time and frequency resolution in CWT' +
+                             'Lower numbers: better time resolution\n' +
+                             'Higher numbers: better freq resolution')
+    parser.add_argument('--figsize', nargs=2, default=(16, 9), type=float,
+                        help='Size of the produced figure in Inches. Default is 16x9, which is good for high' +
+                             'resolution screen display.')
     parser.add_argument('--winlen_HF', default=4., type=float,
                         help='Window length for high-frequency spectrogram (in '
                              'seconds)')
@@ -129,6 +132,7 @@ def main():
                        w0=args.w0,
                        ratio_LF_spec=args.plot_ratio,
                        catalog=cat,
+                       figsize=args.figsize,
                        winlen_sec_HF=args.winlen_HF,
                        winlen_sec_LF=args.winlen)
 
